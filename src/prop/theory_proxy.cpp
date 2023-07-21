@@ -380,6 +380,14 @@ TNode TheoryProxy::getNode(SatLiteral lit) {
   return d_cnfStream->getNode(lit);
 }
 
+TNode TheoryProxy::getOriginalNode(SatLiteral lit) {
+  return d_zll->getOriginalNode(getNode(lit));
+}
+
+bool TheoryProxy::outputLearnedClauses() const {
+  return d_zll && d_zll->outputLearnedClauses();
+}
+
 void TheoryProxy::notifyRestart() {
   d_propEngine->spendResource(Resource::RestartStep);
   d_theoryEngine->notifyRestart();

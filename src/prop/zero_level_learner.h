@@ -68,6 +68,10 @@ class ZeroLevelLearner : protected EnvObj
   std::vector<Node> getLearnedZeroLevelLiteralsForRestart() const;
   /** compute type for learned literal */
   modes::LearnedLitType computeLearnedLiteralType(const Node& lit);
+  /** Return the original node using SkolemManager */
+  TNode getOriginalNode(TNode const &) const;
+  /** Should I output learned clauses (Antti's hack) */
+  bool outputLearnedClauses() const;
 
  private:
   static void getAtoms(TNode a,

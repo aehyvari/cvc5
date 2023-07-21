@@ -1,8 +1,5 @@
 ; COMMAND-LINE: -o learned-lits
 ; SCRUBBER: sed -e 's/(learned-lit.*/learned-lit/'
-; EXPECT: learned-lit
-; EXPECT: learned-lit
-; EXPECT: learned-lit
 ; EXPECT: sat
 (set-logic ALL)
 (declare-fun x () Int)

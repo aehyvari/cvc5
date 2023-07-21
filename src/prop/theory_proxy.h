@@ -148,6 +148,10 @@ class TheoryProxy : protected EnvObj, public Registrar
 
   TNode getNode(SatLiteral lit);
 
+  TNode getOriginalNode(SatLiteral lit);
+
+  bool outputLearnedClauses() const;
+
   void notifyRestart();
 
   void spendResource(Resource r);

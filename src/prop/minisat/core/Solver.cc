@@ -1551,6 +1551,18 @@ lbool Solver::search(int nof_conflicts)
       // Analyze the conflict
       learnt_clause.clear();
       int max_level = analyze(confl, learnt_clause, backtrack_level);
+
+      if (learnt_clause.size() <= 2 && d_proxy->outputLearnedClauses())
+      {
+        std::cout << "(learned-lit (or ";
+        for (int i = 0; i < learnt_clause.size(); i++) {
+            auto lit = learnt_clause[i];
+            auto satLit = MinisatSatSolver::toSatLiteral(lit);
+            auto node = d_proxy->getOriginalNode(satLit);
+            std::cout << node << " ";
+        }
+        std::cout << "))" << std::endl;
+      }
       cancelUntil(backtrack_level);
 
       // Assert the conflict clause and the asserting literal

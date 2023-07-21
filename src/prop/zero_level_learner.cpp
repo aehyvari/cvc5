@@ -275,6 +275,14 @@ modes::LearnedLitType ZeroLevelLearner::computeLearnedLiteralType(
   return ltype;
 }
 
+TNode ZeroLevelLearner::getOriginalNode(TNode const & node) const {
+  return SkolemManager::getOriginalForm(node);
+}
+
+bool ZeroLevelLearner::outputLearnedClauses() const {
+  return isOutputOn(OutputTag::LEARNED_LITS);
+}
+
 void ZeroLevelLearner::processLearnedLiteral(const Node& lit,
                                              modes::LearnedLitType ltype)
 {
@@ -286,7 +294,7 @@ void ZeroLevelLearner::processLearnedLiteral(const Node& lit,
     d_assertNoLearnCount = 0;
   }
   // print to stream
-  if (isOutputOn(OutputTag::LEARNED_LITS))
+  if (false/*isOutputOn(OutputTag::LEARNED_LITS)*/)
   {
     // get the original form so that internally generated variables
     // are mapped back to their original form
