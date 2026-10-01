@@ -177,6 +177,8 @@ if(NOT Poly_FOUND_SYSTEM)
       <SOURCE_DIR>/src/upolynomial/factorization.c
       ${POLY_PATCH_CMD}
     CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release
+               -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+               "-DCMAKE_CXX_FLAGS=-Wno-error=deprecated-literal-operator -Wno-error=vla-cxx-extension"
                -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
                -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
                -DLIBPOLY_BUILD_PYTHON_API=OFF

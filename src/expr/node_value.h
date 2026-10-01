@@ -136,11 +136,11 @@ class CVC5_EXPORT NodeValue
       return *this;
     }
 
-    iterator operator+(difference_type p) { return iterator(d_i + p); }
+    iterator operator+(difference_type p) const { return iterator(d_i + p); }
 
-    iterator operator-(difference_type p) { return iterator(d_i - p); }
+    iterator operator-(difference_type p) const { return iterator(d_i - p); }
 
-    difference_type operator-(iterator i) { return d_i - i.d_i; }
+    difference_type operator-(iterator i) const { return d_i - i.d_i; }
 
    private:
     const_nv_iterator d_i;
