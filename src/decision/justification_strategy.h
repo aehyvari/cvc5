@@ -18,6 +18,7 @@
 #ifndef CVC5__DECISION__JUSTIFICATION_STRATEGY_H
 #define CVC5__DECISION__JUSTIFICATION_STRATEGY_H
 
+#include "context/cdhashset.h"
 #include "context/cdinsert_hashmap.h"
 #include "context/cdo.h"
 #include "decision/assertion_list.h"
@@ -169,7 +170,9 @@ class JustificationStrategy : public DecisionEngine
    * Helper method to insert assertions in `toProcess` to `d_assertions` or
    * `d_skolemAssertions` based on `useSkolemList`.
    */
-  void insertToAssertionList(std::vector<TNode>& toProcess, bool useSkolemList);
+  void insertToAssertionList(std::vector<TNode>& toProcess,
+                             bool useSkolemList,
+                             bool isInput);
   /**
    * Refresh current assertion. This ensures that d_stack has a current
    * assertion to satisfy. If it does not already have one, we take the next
@@ -210,6 +213,12 @@ class JustificationStrategy : public DecisionEngine
   JustifyNode getNextJustifyNode(JustifyInfo* ji, prop::SatValue& lastChildVal);
   /** Is n a theory literal? */
   static bool isTheoryLiteral(TNode n);
+  /** Whether --jh-shuffle-seed applies to the current assertion */
+  bool shuffleCurrent() const;
+  /** Pseudo-random hash of n, fixed for a given --jh-shuffle-seed */
+  uint64_t shuffleHash(TNode n) const;
+  /** The fixed pseudo-random order in which to visit the children of n */
+  const std::vector<uint32_t>& getChildOrder(TNode n);
   /** The assertions, which are user-context dependent. */
   AssertionList d_assertions;
   /** The skolem assertions */
@@ -235,6 +244,14 @@ class JustificationStrategy : public DecisionEngine
   options::JutificationSkolemMode d_jhSkMode;
   /** skolem relevancy mode */
   options::JutificationSkolemRlvMode d_jhSkRlvMode;
+  /** --jh-shuffle-seed, zero if disabled */
+  uint64_t d_shuffleSeed;
+  /** --jh-shuffle-lemmas */
+  bool d_shuffleLemmas;
+  /** The input assertions (user-context dependent) */
+  context::CDHashSet<Node> d_inputs;
+  /** Cache of child orders computed by getChildOrder */
+  std::unordered_map<Node, std::vector<uint32_t>> d_childOrder;
   /** The statistics */
   JustifyStatistics d_stats;
 };

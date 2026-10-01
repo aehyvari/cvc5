@@ -17,6 +17,7 @@
 
 #include "expr/node_algorithm.h"
 #include "prop/skolem_def_manager.h"
+#include "util/random.h"
 
 using namespace cvc5::internal::kind;
 using namespace cvc5::internal::prop;
@@ -44,6 +45,9 @@ JustificationStrategy::JustificationStrategy(Env& env,
                          == options::DecisionMode::STOPONLY),
       d_jhSkMode(options().decision.jhSkolemMode),
       d_jhSkRlvMode(options().decision.jhSkolemRlvMode),
+      d_shuffleSeed(options().decision.jhShuffleSeed),
+      d_shuffleLemmas(options().decision.jhShuffleLemmas),
+      d_inputs(userContext()),
       d_stats(statisticsRegistry())
 {
 }
@@ -234,6 +238,7 @@ JustifyNode JustificationStrategy::getNextJustifyNode(
   Assert(ck != Kind::NOT);
   // get the next child index to process
   size_t i = ji->getNextChildIndex();
+  bool shuffle = d_shuffleSeed != 0 && shuffleCurrent();
   Trace("jh-debug") << "getNextJustifyNode " << curr << " / " << currPol
                     << ", index = " << i
                     << ", last child value = " << lastChildVal << std::endl;
@@ -341,10 +346,19 @@ JustifyNode JustificationStrategy::getNextJustifyNode(
       // if both children are unknown. If both children have the same value
       // and that value is not unknown, desiredVal will be ignored, since
       // value is set above.
-      desiredVal =
-          (val1 == invertValue(currDesiredVal) || val2 == currDesiredVal)
-              ? SAT_VALUE_FALSE
-              : SAT_VALUE_TRUE;
+      if (val1 == invertValue(currDesiredVal) || val2 == currDesiredVal)
+      {
+        desiredVal = SAT_VALUE_FALSE;
+      }
+      else if (val1 == SAT_VALUE_UNKNOWN && val2 == SAT_VALUE_UNKNOWN
+               && shuffle)
+      {
+        desiredVal = (shuffleHash(curr) & 1) ? SAT_VALUE_TRUE : SAT_VALUE_FALSE;
+      }
+      else
+      {
+        desiredVal = SAT_VALUE_TRUE;
+      }
     }
     else if (i == 1)
     {
@@ -375,7 +389,8 @@ JustifyNode JustificationStrategy::getNextJustifyNode(
       if (val1 == SAT_VALUE_UNKNOWN)
       {
         // not forced, arbitrarily choose true
-        desiredVal = SAT_VALUE_TRUE;
+        desiredVal = (shuffle && !(shuffleHash(curr) & 1)) ? SAT_VALUE_FALSE
+                                                            : SAT_VALUE_TRUE;
       }
       else
       {
@@ -435,6 +450,11 @@ JustifyNode JustificationStrategy::getNextJustifyNode(
     // return null, indicating there is nothing left to do for current
     return JustifyNode(TNode::null(), SAT_VALUE_UNKNOWN);
   }
+  if (shuffle && (ck == Kind::AND || ck == Kind::OR)
+      && i < curr.getNumChildren())
+  {
+    i = getChildOrder(curr)[i];
+  }
   Trace("jh-debug") << "getJustifyNode: return " << curr[i]
                     << " with desired value " << desiredVal << std::endl;
   // The next child should be a valid argument in curr. Otherwise, we did not
@@ -447,6 +467,42 @@ JustifyNode JustificationStrategy::getNextJustifyNode(
   return JustifyNode(curr[i], desiredVal);
 }
 
+bool JustificationStrategy::shuffleCurrent() const
+{
+  return d_shuffleLemmas
+         || d_inputs.find(d_stack.getCurrentAssertion()) != d_inputs.end();
+}
+
+uint64_t JustificationStrategy::shuffleHash(TNode n) const
+{
+  // splitmix64 finalizer of the seed combined with the node id
+  uint64_t z = d_shuffleSeed + n.getId() * 0x9e3779b97f4a7c15ULL;
+  z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+  z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+  return z ^ (z >> 31);
+}
+
+const std::vector<uint32_t>& JustificationStrategy::getChildOrder(TNode n)
+{
+  auto it = d_childOrder.find(n);
+  if (it != d_childOrder.end())
+  {
+    return it->second;
+  }
+  std::vector<uint32_t>& order = d_childOrder[n];
+  order.resize(n.getNumChildren());
+  for (uint32_t j = 0, nchild = n.getNumChildren(); j < nchild; j++)
+  {
+    order[j] = j;
+  }
+  Random rand(shuffleHash(n));
+  for (size_t j = order.size(); j > 1; j--)
+  {
+    std::swap(order[j - 1], order[rand.pick(0, j - 1)]);
+  }
+  return order;
+}
+
 bool JustificationStrategy::isDone() { return !refreshCurrentAssertion(); }
 
 void JustificationStrategy::addAssertion(TNode lem, TNode skolem, bool isLemma)
@@ -455,14 +511,14 @@ void JustificationStrategy::addAssertion(TNode lem, TNode skolem, bool isLemma)
   if (skolem.isNull())
   {
     std::vector<TNode> toProcess{lem};
-    insertToAssertionList(toProcess, false);
+    insertToAssertionList(toProcess, false, !isLemma);
   }
   else if (d_jhSkRlvMode == options::JutificationSkolemRlvMode::ALWAYS)
   {
     // just add to main assertions list
     std::vector<TNode> toProcess;
     toProcess.push_back(lem);
-    insertToAssertionList(toProcess, false);
+    insertToAssertionList(toProcess, false, false);
   }
 }
 bool JustificationStrategy::needsActiveSkolemDefs() const
@@ -477,7 +533,7 @@ void JustificationStrategy::notifyActiveSkolemDefs(std::vector<TNode>& defs)
   {
     // assertion processed makes all skolems in assertion active,
     // which triggers their definitions to becoming relevant
-    insertToAssertionList(defs, true);
+    insertToAssertionList(defs, true, false);
     // NOTE: if we had a notifyAsserted callback, we could update tracking
     // triggers, pop stack to where a child implied that a node on the current
     // stack is justified.
@@ -485,7 +541,8 @@ void JustificationStrategy::notifyActiveSkolemDefs(std::vector<TNode>& defs)
 }
 
 void JustificationStrategy::insertToAssertionList(std::vector<TNode>& toProcess,
-                                                  bool useSkolemList)
+                                                  bool useSkolemList,
+                                                  bool isInput)
 {
   AssertionList& al = useSkolemList ? d_skolemAssertions : d_assertions;
   IntStat& sizeStat =
@@ -520,6 +577,10 @@ void JustificationStrategy::insertToAssertionList(std::vector<TNode>& toProcess,
     else if (!expr::isTheoryAtom(currAtom))
     {
       al.addAssertion(curr);
+      if (isInput)
+      {
+        d_inputs.insert(curr);
+      }
       // take stats
       sizeStat.maxAssign(al.size());
     }

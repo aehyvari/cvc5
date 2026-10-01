@@ -57,3 +57,19 @@ name   = "Decision Heuristics"
 [[option.mode.ALWAYS]]
   name = "always"
   help = "skolems are always relevant"
+
+[[option]]
+  name       = "jhShuffleSeed"
+  category   = "expert"
+  long       = "jh-shuffle-seed=N"
+  type       = "uint64_t"
+  default    = "0"
+  help       = "if non-zero, the justification heuristic visits the children of each AND/OR in a fixed pseudo-random order, and picks unforced ITE/XOR/EQUAL values pseudo-randomly, derived from this seed"
+
+[[option]]
+  name       = "jhShuffleLemmas"
+  category   = "expert"
+  long       = "jh-shuffle-lemmas"
+  type       = "bool"
+  default    = "false"
+  help       = "apply --jh-shuffle-seed to theory lemmas and skolem definitions, not only to input assertions"
